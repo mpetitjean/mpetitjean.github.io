@@ -60,7 +60,7 @@ const outfile = process.argv[4];
 
 // Set the browser width in pixels. The paper size will be calculated on the basus of 96dpi,
 // so 1200 corresponds to 12.5".
-const width_px = 1800;
+const width_px = 1200;
 // Note that to get an actual paper size, e.g. Letter, you will want to *not* simply set the pixel
 // size here, since that would lead to a "mobile-sized" screen (816px), and mess up the rendering.
 // Instead, set e.g. double the size here (1632px), and call page.pdf() with format: 'Letter' and
@@ -80,7 +80,8 @@ const auth_header = 'Basic ' + new Buffer.from(auth_string).toString('base64');
   await page.setDefaultNavigationTimeout(7200);
 
   // Increasing the deviceScaleFactor gets a higher-resolution image. The width should be set to
-  // the same value as in page.pdf() below. The height is not important
+  // the same value as in page.screenshot() below. The height is not important but should be long
+  // enough to get the whole page
   await page.setViewport({
     width: width_px,
     height: 10000,
@@ -106,10 +107,17 @@ const auth_header = 'Basic ' + new Buffer.from(auth_string).toString('base64');
   var height_px = await page.evaluate(() => {
     return document.getElementsByClassName('react-grid-layout')[0].getBoundingClientRect().bottom;
   }) + 20;
-  
+
+  console.log(height_px);
+
   await page.screenshot({
     path: outfile,
-    fullPage: true
+    clip: {
+      x: 0,
+      y: 0,
+      width: width_px,
+      height: height_px
+    }
   });
 
   await browser.close();
@@ -130,8 +138,6 @@ where:
 - `FILENAME` is the expected output filename
 
 The arguments can also be hardcoded in the code, or used as environmental variables depending on your preferences.
-
-> **⚠ NOTE:** the variable `height` must be adapted to the length of your dashboard, or you will have a long blank space at the end of the document.
 
 The PNG screenshot can then be converted to PDF via
 
