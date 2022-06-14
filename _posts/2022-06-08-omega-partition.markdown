@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Extend memory and swap with an SD card on an Omega2S"
-date:   2022-06-14 12:17:02 +0200
+date:   2022-06-08 12:17:02 +0200
 categories: omega
 ---
 
