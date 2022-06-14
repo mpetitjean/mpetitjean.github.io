@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Extend memory and swap with an SD card on an Omega2S"
-date:   2022-05-30 12:17:02 +0200
+date:   2022-06-14 12:17:02 +0200
 categories: omega
 ---
 
@@ -327,7 +327,7 @@ tmpfs                   512.0K         0    512.0K   0% /dev
 /dev/mtdblock7          512.0K    244.0K    268.0K  48% /mnt/mtdblock7
 ```
 
-Then check the swap with `free`. (TODO update)
+Then check the swap with `free`.
 
 ```
              total       used       free     shared    buffers     cached
