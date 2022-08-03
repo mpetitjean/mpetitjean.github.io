@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Export a Grafana dashboard to PDF with legends in Grafana v8+ | Mathieu Petitjean’s blog</title>
+<meta name="generator" content="Jekyll v4.2.2" />
+<meta property="og:title" content="Export a Grafana dashboard to PDF with legends in Grafana v8+" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="TL;DR" />
+<meta property="og:description" content="TL;DR" />
+<link rel="canonical" href="/grafana/2022/05/30/grafana-to-pdf.html" />
+<meta property="og:url" content="/grafana/2022/05/30/grafana-to-pdf.html" />
+<meta property="og:site_name" content="Mathieu Petitjean’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2022-05-30T05:17:02-05:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Export a Grafana dashboard to PDF with legends in Grafana v8+" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","dateModified":"2022-05-30T05:17:02-05:00","datePublished":"2022-05-30T05:17:02-05:00","description":"TL;DR","headline":"Export a Grafana dashboard to PDF with legends in Grafana v8+","mainEntityOfPage":{"@type":"WebPage","@id":"/grafana/2022/05/30/grafana-to-pdf.html"},"url":"/grafana/2022/05/30/grafana-to-pdf.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="/feed.xml" title="Mathieu Petitjean&apos;s blog" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Mathieu Petitjean&#39;s blog</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a><a class="page-link" href="/publications/">Publications</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Export a Grafana dashboard to PDF with legends in Grafana v8+</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2022-05-30T05:17:02-05:00" itemprop="datePublished">May 30, 2022
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <h1 id="tldr">TL;DR</h1>
+
+<p>This short article describes how to automatically generate PDFs from a Grafana dashboard when:</p>
+<ul>
+  <li>you are not using the paid Grafana Enterprise version</li>
+  <li>you are using Grafana <code class="language-plaintext highlighter-rouge">v7.4.0</code> or more recent</li>
+</ul>
+
+<h1 id="context">Context</h1>
+
+<p>If you use Grafana dashboards, you might want (or might have been asked) to generate PDF snapshots of those dashboards.
+This is a feature supported by <strong>Grafana Enterprise only</strong> (starting from version <code class="language-plaintext highlighter-rouge">v6.7+</code>, see related <a href="https://grafana.com/docs/grafana/latest/enterprise/export-pdf/">docs</a>).</p>
+
+<p>Many, me included, use the Open Source version and have relied on an alternative relying on the “Print to PDF” option of web browsers, which can be automated using a headless browser using <code class="language-plaintext highlighter-rouge">NodeJS</code> and the <code class="language-plaintext highlighter-rouge">puppeteer</code> package. Full credit to GitHub user <a href="https://gist.github.com/svet-b">svet-b</a> and his detailed description found <a href="https://gist.github.com/svet-b/1ad0656cd3ce0e1a633e16eb20f66425">here</a>.</p>
+
+<p>However, since the update to <code class="language-plaintext highlighter-rouge">v7.4.0</code>, the legend is not properly shown when generating the PDF, as you can see from the screenshots below.</p>
+
+<p><img src="/img/legend-nok.png" alt="The color lines of the legend are not properly rendered" /></p>
+
+<p>I posted an <a href="https://github.com/grafana/grafana/issues/36656">issue</a> to Grafana’s GitHub repository documenting the issue with the legend. It was not really investigated (neither by the Grafana team nor me).</p>
+
+<p>A simple workaround is to simply take a (lossless) <strong>screenshot</strong> of the full page with a headless browser. The screenshot can then be converted to PDF via the command line.</p>
+
+<h1 id="installation">Installation</h1>
+
+<p>The screenshot is taken using <code class="language-plaintext highlighter-rouge">NodeJS</code> and the <code class="language-plaintext highlighter-rouge">puppeteer</code> package, and the PDF conversion is done via <code class="language-plaintext highlighter-rouge">img2pdf</code>. On a Debian-based system, the dependencies and programs can be installed via:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo apt install nodejs npm img2pdf gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils wget
+</code></pre></div></div>
+
+<p>Then, install the <code class="language-plaintext highlighter-rouge">puppeteer</code> package:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>npm install puppeteer
+</code></pre></div></div>
+
+<h1 id="running">Running</h1>
+
+<p>The Node script generating the screenshot is the following:</p>
+
+<figure class="highlight"><pre><code class="language-javascript" data-lang="javascript"><span class="dl">'</span><span class="s1">use strict</span><span class="dl">'</span><span class="p">;</span>
+
+<span class="kd">const</span> <span class="nx">puppeteer</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">puppeteer</span><span class="dl">'</span><span class="p">);</span>
+
+<span class="c1">// URL to load should be passed as first parameter</span>
+<span class="kd">const</span> <span class="nx">url</span> <span class="o">=</span> <span class="nx">process</span><span class="p">.</span><span class="nx">argv</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span>
+<span class="c1">// Username and password (with colon separator) should be second parameter</span>
+<span class="kd">const</span> <span class="nx">auth_string</span> <span class="o">=</span> <span class="nx">process</span><span class="p">.</span><span class="nx">argv</span><span class="p">[</span><span class="mi">3</span><span class="p">];</span>
+<span class="c1">// Output file name should be third parameter</span>
+<span class="kd">const</span> <span class="nx">outfile</span> <span class="o">=</span> <span class="nx">process</span><span class="p">.</span><span class="nx">argv</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span>
+
+<span class="c1">// TODO: Output an error message if number of arguments is not right or arguments are invalid</span>
+
+<span class="c1">// Set the browser width in pixels. The paper size will be calculated on the basus of 96dpi,</span>
+<span class="c1">// so 1200 corresponds to 12.5".</span>
+<span class="kd">const</span> <span class="nx">width_px</span> <span class="o">=</span> <span class="mi">1200</span><span class="p">;</span>
+<span class="c1">// Note that to get an actual paper size, e.g. Letter, you will want to *not* simply set the pixel</span>
+<span class="c1">// size here, since that would lead to a "mobile-sized" screen (816px), and mess up the rendering.</span>
+<span class="c1">// Instead, set e.g. double the size here (1632px), and call page.pdf() with format: 'Letter' and</span>
+<span class="c1">// scale = 0.5.</span>
+
+<span class="c1">// Generate authorization header for basic auth</span>
+<span class="kd">const</span> <span class="nx">auth_header</span> <span class="o">=</span> <span class="dl">'</span><span class="s1">Basic </span><span class="dl">'</span> <span class="o">+</span> <span class="k">new</span> <span class="nx">Buffer</span><span class="p">.</span><span class="k">from</span><span class="p">(</span><span class="nx">auth_string</span><span class="p">).</span><span class="nx">toString</span><span class="p">(</span><span class="dl">'</span><span class="s1">base64</span><span class="dl">'</span><span class="p">);</span>
+
+<span class="p">(</span><span class="k">async</span><span class="p">()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">browser</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">puppeteer</span><span class="p">.</span><span class="nx">launch</span><span class="p">({</span><span class="na">args</span><span class="p">:</span> <span class="p">[</span><span class="dl">'</span><span class="s1">--no-sandbox</span><span class="dl">'</span><span class="p">,</span> <span class="dl">'</span><span class="s1">--disable-setuid-sandbox</span><span class="dl">'</span><span class="p">]});</span>
+  <span class="kd">const</span> <span class="nx">page</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">browser</span><span class="p">.</span><span class="nx">newPage</span><span class="p">();</span>
+
+  <span class="c1">// Set basic auth headers</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">setExtraHTTPHeaders</span><span class="p">({</span><span class="dl">'</span><span class="s1">Authorization</span><span class="dl">'</span><span class="p">:</span> <span class="nx">auth_header</span><span class="p">});</span>
+
+  <span class="c1">// Increase timeout from the default of 30 seconds to 120 seconds, to allow for slow-loading panels</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">setDefaultNavigationTimeout</span><span class="p">(</span><span class="mi">7200</span><span class="p">);</span>
+
+  <span class="c1">// Increasing the deviceScaleFactor gets a higher-resolution image. The width should be set to</span>
+  <span class="c1">// the same value as in page.screenshot() below. The height is not important but should be long</span>
+  <span class="c1">// enough to get the whole page</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">setViewport</span><span class="p">({</span>
+    <span class="na">width</span><span class="p">:</span> <span class="nx">width_px</span><span class="p">,</span>
+    <span class="na">height</span><span class="p">:</span> <span class="mi">10000</span><span class="p">,</span>
+    <span class="na">deviceScaleFactor</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="na">isMobile</span><span class="p">:</span> <span class="kc">false</span>
+  <span class="p">})</span>
+
+  <span class="c1">// Wait until all network connections are closed (and none are opened withing 0.5s).</span>
+  <span class="c1">// In some cases it may be appropriate to change this to {waitUntil: 'networkidle2'},</span>
+  <span class="c1">// which stops when there are only 2 or fewer connections remaining.</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">goto</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span> <span class="p">{</span><span class="na">waitUntil</span><span class="p">:</span> <span class="dl">'</span><span class="s1">networkidle0</span><span class="dl">'</span><span class="p">});</span>
+
+  <span class="c1">// Hide all panel description (top-left "i") pop-up handles and, all panel resize handles</span>
+  <span class="c1">// Annoyingly, it seems you can't concatenate the two object collections into one</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">evaluate</span><span class="p">(()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">infoCorners</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByClassName</span><span class="p">(</span><span class="dl">'</span><span class="s1">panel-info-corner</span><span class="dl">'</span><span class="p">);</span>
+    <span class="k">for</span> <span class="p">(</span><span class="nx">el</span> <span class="k">of</span> <span class="nx">infoCorners</span><span class="p">)</span> <span class="p">{</span> <span class="nx">el</span><span class="p">.</span><span class="nx">hidden</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span> <span class="p">};</span>
+    <span class="kd">let</span> <span class="nx">resizeHandles</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByClassName</span><span class="p">(</span><span class="dl">'</span><span class="s1">react-resizable-handle</span><span class="dl">'</span><span class="p">);</span>
+    <span class="k">for</span> <span class="p">(</span><span class="nx">el</span> <span class="k">of</span> <span class="nx">resizeHandles</span><span class="p">)</span> <span class="p">{</span> <span class="nx">el</span><span class="p">.</span><span class="nx">hidden</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span> <span class="p">};</span>
+  <span class="p">});</span>
+
+  <span class="c1">// Get the height of the main canvas, and add a margin</span>
+  <span class="kd">var</span> <span class="nx">height_px</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">evaluate</span><span class="p">(()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByClassName</span><span class="p">(</span><span class="dl">'</span><span class="s1">react-grid-layout</span><span class="dl">'</span><span class="p">)[</span><span class="mi">0</span><span class="p">].</span><span class="nx">getBoundingClientRect</span><span class="p">().</span><span class="nx">bottom</span><span class="p">;</span>
+  <span class="p">})</span> <span class="o">+</span> <span class="mi">20</span><span class="p">;</span>
+
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">height_px</span><span class="p">);</span>
+
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">screenshot</span><span class="p">({</span>
+    <span class="na">path</span><span class="p">:</span> <span class="nx">outfile</span><span class="p">,</span>
+    <span class="na">clip</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">x</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+      <span class="na">y</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+      <span class="na">width</span><span class="p">:</span> <span class="nx">width_px</span><span class="p">,</span>
+      <span class="na">height</span><span class="p">:</span> <span class="nx">height_px</span>
+    <span class="p">}</span>
+  <span class="p">});</span>
+
+  <span class="k">await</span> <span class="nx">browser</span><span class="p">.</span><span class="nx">close</span><span class="p">();</span>
+<span class="p">})();</span></code></pre></figure>
+
+<p>The script, for example saved as <code class="language-plaintext highlighter-rouge">grafana_pdf.js</code>, is then run by the following command :</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>node grafana_pdf.js DASHBOARD_URL USERNAME:PASSWORD FILENAME
+</code></pre></div></div>
+
+<p>where:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">DASHBOARD_URL</code> is the URL of the dashboard to generate</li>
+  <li><code class="language-plaintext highlighter-rouge">USERNAME:PASSWORD</code> are your credentials, for example the defaut <code class="language-plaintext highlighter-rouge">admin:admin</code></li>
+  <li><code class="language-plaintext highlighter-rouge">FILENAME</code> is the expected output filename</li>
+</ul>
+
+<p>The arguments can also be hardcoded in the code, or used as environmental variables depending on your preferences.</p>
+
+<p>The PNG screenshot can then be converted to PDF via</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>img2pdf screenshot.png -o output.pdf
+</code></pre></div></div>
+
+<p>The series of command can easily be automated via a cron job to generate a report at a given interval.</p>
+
+
+  </div><a class="u-url" href="/grafana/2022/05/30/grafana-to-pdf.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Mathieu Petitjean&#39;s blog</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Mathieu Petitjean&#39;s blog</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/mpetitjean"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">mpetitjean</span></a></li><li><a href="https://www.twitter.com/mpetitje"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg> <span class="username">mpetitje</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Random tech tutorials</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

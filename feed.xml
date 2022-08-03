@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.2.2">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2022-08-03T07:05:53-05:00</updated><id>/feed.xml</id><title type="html">Mathieu Petitjean’s blog</title><subtitle>Random tech tutorials</subtitle><entry><title type="html">PWM-controlled variable voltage source using a LM317</title><link href="/hardware/2022/08/01/variable-voltage-source.html" rel="alternate" type="text/html" title="PWM-controlled variable voltage source using a LM317" /><published>2022-08-01T03:17:02-05:00</published><updated>2022-08-01T03:17:02-05:00</updated><id>/hardware/2022/08/01/variable-voltage-source</id><content type="html" xml:base="/hardware/2022/08/01/variable-voltage-source.html"><![CDATA[<h1 id="tldr">TL;DR</h1>
+
+<p>This post describes how to use a LM317 module to generate a voltage source that can be controlled by a microcontroller using PWM signals and a generic op-amp.</p>
+
+<h1 id="the-problem">The problem</h1>
+
+<p>One of my projects required me to generate a 1A power supply that could programmatically be adjusted between 2V and 9V by a microcontroller operating with 3.3V logic.</p>
+
+<p>The board embeds both 12V and 3.3V rails.</p>
+
+<h1 id="the-lm317-voltage-regulator">The LM317 voltage regulator</h1>
+
+<p>The LM317 is an extermely widespread adjustable voltage regulator capable of supplying 1.5A over a voltage range of 1.25 to 37V (see <a href="https://www.ti.com/lit/ds/symlink/lm317.pdf">full datasheet</a>).</p>
+
+<p>The typical application circuit, as suggested in the datasheet, is shown below.</p>
+
+<p><img src="/img/lm317-base.png" alt="Typical application circuit of the LM317" /></p>
+
+<p>The output voltage is set by the value of the resistors R1 and R2, such that Vout = 1.25V x (1 + R2/R1). In an application where a constant voltage is required, the resistors can be set permanantly. The resistor R2 can also be replaced by a potentiometer to allow for manual adjustment.</p>
+
+<p>The voltage generation can be better understood when looking at the functional block diagram of the LM317.</p>
+
+<p><img src="/img/lm317-block.png" alt="LM317 functionnal block diagram" /></p>
+
+<p>It can be seen that an internal op-amp with a constant input offset voltage of 1.25V is maintaining a constant 1.25V voltage difference between the OUTPUT and ADJUST pins. A higher R2 value will lead to a higher ADJUST voltage, and the OUTPUT voltage will be 1.25V more.</p>
+
+<p>This constant 1.25V between the two pins can be exploited to programmatically change the output voltage.</p>
+
+<h1 id="pwm-control">PWM control</h1>
+
+<p>Since my particular application requires an output voltage between 2V and 9V, the ADJUST pin needs to be freely set between 0.75V and 7.75V.</p>
+
+<p>With a microcontroller that does not embed any DAC, this can be achieved by generating a 3.3V PWM signal which is then lowpass-filtered (<em>i.e.</em> averaged out), than amplified.</p>
+
+<p>The resulting complete schematic is the following:</p>
+
+<p><img src="/img/lm317-pwm.png" alt="Complete schematic with PWM control" /></p>
+
+<p>The PWM signal is filtered to (roughly) DC by a low-pass filter with a 1Hz cut-off frequency. Depending on the ducty cycle of the PWM, the voltage at the input of the op-amp will range from 0 to 3.3V. It is then amplified a by the non-inverting op-amp with a gain of 2.3 to a range that roughly scales from 0 to 7.75V. Finally, the output voltage ranges from 1.25 to 9V.</p>
+
+<p>Note that the resistor R4 is crucial for proper operation of the LM317 at no load. Indeed, as specified in the datasheet, a minimum load current of 3.5 to 10 mA is required to maintain the required output voltage. This current is flowing through resistor R4 when no other load is connected.</p>]]></content><author><name></name></author><category term="hardware" /><summary type="html"><![CDATA[TL;DR]]></summary></entry><entry><title type="html">Extend memory and swap with an SD card on an Omega2S</title><link href="/omega/2022/06/08/omega-partition.html" rel="alternate" type="text/html" title="Extend memory and swap with an SD card on an Omega2S" /><published>2022-06-08T05:17:02-05:00</published><updated>2022-06-08T05:17:02-05:00</updated><id>/omega/2022/06/08/omega-partition</id><content type="html" xml:base="/omega/2022/06/08/omega-partition.html"><![CDATA[<h3 id="tldr">TL;DR</h3>
+
+<p>This post describes how to use an SD card to extend the storage space and create swap for an Omega2S/Omega2S+.</p>
+
+<h3 id="context">Context</h3>
+
+<h1 id="storage">Storage</h1>
+
+<p>The filesystem of the Omega has two main parts: <code class="language-plaintext highlighter-rouge">/rom</code> contains the base firmware and is read-only and <code class="language-plaintext highlighter-rouge">/overlay</code> contains the changes on top of the base firmware, typically the packages installed via <code class="language-plaintext highlighter-rouge">opkg</code>. At boot, both are used to create the entire filesystem.</p>
+
+<p>The <code class="language-plaintext highlighter-rouge">/overlay</code> and <code class="language-plaintext highlighter-rouge">/root</code> can be mounted to dedicated partitions of an SD card to circumvent the harsh storage limitations of the Omega.</p>
+
+<h1 id="swap">Swap</h1>
+
+<p>Yet another partition of the SD Card can be used to virtually extend the RAM of the Omega.</p>
+
+<h3 id="setup">Setup</h3>
+
+<h1 id="installation">Installation</h1>
+
+<p>Install the required packages via <code class="language-plaintext highlighter-rouge">opkg</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>opkg update
+opkg install fdisk kmod-fs-ext4 e2fsprogs swap-utils block-mount
+</code></pre></div></div>
+
+<h1 id="preparation">Preparation</h1>
+
+<p>Insert your SD Card and look for it via</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fdisk -l
+</code></pre></div></div>
+
+<p>One of the entries should look like the following:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Disk /dev/mmcblk0: 14.9 GiB, 15931539456 bytes, 31116288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+</code></pre></div></div>
+
+<p>The SD card should appear under <code class="language-plaintext highlighter-rouge">/dev/mmcblk0</code>. Mine is a 16 GB SD card, detected as 14.9 GiB. If your SD card is already partitioned, the partitions will show up as <code class="language-plaintext highlighter-rouge">/dev/mmcblk0p1</code>, <code class="language-plaintext highlighter-rouge">/dev/mmcblk0p2</code>, etc. These partitions should be deleted before continuing the process.</p>
+
+<p>Make sure the SD card is not currently mounted by running</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>umount /dev/mmcblk0
+</code></pre></div></div>
+<p>If it was not mounted, the following error will be thrown:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>umount: can't unmount /dev/mmcblk0: Invalid argument
+</code></pre></div></div>
+
+<p>You can confirm that no swap is available by running</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>free
+</code></pre></div></div>
+<p>and observing in the output that all swap entries are 0.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>             total       used       free     shared    buffers     cached
+Mem:        124792      43848      80944         96       5784      15928
+-/+ buffers/cache:      22136     102656
+Swap:            0          0          0
+</code></pre></div></div>
+
+<h1 id="create-partitions">Create partitions</h1>
+
+<p>Use <code class="language-plaintext highlighter-rouge">fdisk</code> to create the partitions.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fdisk /dev/mmcblk0
+</code></pre></div></div>
+
+<p>A prompt will open. We will create 3 partitions: a first of 2GB for the swap, a second of 6GB for the <code class="language-plaintext highlighter-rouge">/overlay</code> and a third of roughly 8GB for <code class="language-plaintext highlighter-rouge">/root</code>.</p>
+
+<p>Enter the following commands to create the 3 partitions:</p>
+<ul>
+  <li>type <code class="language-plaintext highlighter-rouge">n</code> to create the swap partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">p</code> to select the primary type</li>
+  <li>type <code class="language-plaintext highlighter-rouge">1</code> for the partition number</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to accept the proposed first sector</li>
+  <li>type <code class="language-plaintext highlighter-rouge">+2G</code> to select a size of 2GB for the partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">n</code> to create the <code class="language-plaintext highlighter-rouge">/overlay</code> partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">p</code> to select the primary type</li>
+  <li>type <code class="language-plaintext highlighter-rouge">2</code> for the partition number</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to accept the proposed first sector</li>
+  <li>type <code class="language-plaintext highlighter-rouge">+6G</code> to select a size of 6GB for the partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">n</code> to create the <code class="language-plaintext highlighter-rouge">/root</code> partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">p</code> to select the primary type</li>
+  <li>type <code class="language-plaintext highlighter-rouge">3</code> for the partition number</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to accept the proposed first sector</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to select the last sector as to use the remaining space (should be around 8GB for a 16GB SD Card)</li>
+</ul>
+
+<p>The full output of the <code class="language-plaintext highlighter-rouge">fdisk</code> prompt should look like this:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Welcome to fdisk (util-linux 2.32).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-31116287, default 2048):
+Last sector, +sectors or +size{K,M,G,T,P} (2048-31116287, default 31116287): +2G
+
+Created a new partition 1 of type 'Linux' and of size 2 GiB.
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (2-4, default 2): 2
+First sector (4196352-31116287, default 4196352):
+Last sector, +sectors or +size{K,M,G,T,P} (4196352-31116287, default 31116287): +6G
+
+Created a new partition 2 of type 'Linux' and of size 6 GiB.
+
+Command (m for help): n
+Partition type
+   p   primary (2 primary, 0 extended, 2 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (3,4, default 3): 3
+First sector (16779264-31116287, default 16779264):
+Last sector, +sectors or +size{K,M,G,T,P} (16779264-31116287, default 31116287):
+
+Created a new partition 3 of type 'Linux' and of size 6.9 GiB.
+</code></pre></div></div>
+
+<p>Switch the partition type of the swap partition by pressing <code class="language-plaintext highlighter-rouge">t</code>, <code class="language-plaintext highlighter-rouge">1</code>, then <code class="language-plaintext highlighter-rouge">82</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Command (m for help): t
+Partition number (1,2,3, default 3): 1
+Partition type (type L to list all types): 82
+
+Changed type of partition 'Linux' to 'Linux swap / Solaris'.
+</code></pre></div></div>
+
+<p>You can now print the partition table that you created with the <code class="language-plaintext highlighter-rouge">p</code> command and verify that everything looks right.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Disk /dev/mmcblk0: 14.9 GiB, 15931539456 bytes, 31116288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x3d19fbba
+
+Device         Boot    Start      End  Sectors  Size Id Type
+/dev/mmcblk0p1          2048  4196351  4194304    2G 82 Linux swap / Solaris
+/dev/mmcblk0p2       4196352 16779263 12582912    6G 83 Linux
+/dev/mmcblk0p3      16779264 31116287 14337024  6.9G 83 Linux
+</code></pre></div></div>
+
+<p>Write the partition with the <code class="language-plaintext highlighter-rouge">w</code> command.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+</code></pre></div></div>
+
+<p>You can now run <code class="language-plaintext highlighter-rouge">fdisk -l</code> again and observe that your partitions have been changed.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Disk /dev/mmcblk0: 14.9 GiB, 15931539456 bytes, 31116288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x3d19fbba
+
+Device         Boot    Start      End  Sectors  Size Id Type
+/dev/mmcblk0p1          2048  4196351  4194304    2G 82 Linux swap / Solaris
+/dev/mmcblk0p2       4196352 16779263 12582912    6G 83 Linux
+/dev/mmcblk0p3      16779264 31116287 14337024  6.9G 83 Linux
+</code></pre></div></div>
+
+<h1 id="format-the-sd-card">Format the SD Card</h1>
+
+<p>Format both Linux partitions as ext4.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mkfs.ext4 /dev/mmcblk0p2
+mkfs.ext4 /dev/mmcblk0p3
+</code></pre></div></div>
+
+<h1 id="setup-swap">Setup swap</h1>
+
+<p>Format the Linux swap partition and enable the swap.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mkswap /dev/mmcblk0p1
+swapon /dev/mmcblk0p1
+</code></pre></div></div>
+
+<p>You can run again the <code class="language-plaintext highlighter-rouge">free -k</code> command, which should now display the new swap space:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>             total       used       free     shared    buffers     cached
+Mem:        124792      35748      89044         96       5876       7160
+-/+ buffers/cache:      22712     102080
+Swap:      2097148          0    2097148
+
+</code></pre></div></div>
+
+<h1 id="mount-the-root-partition">Mount the <code class="language-plaintext highlighter-rouge">/root</code> partition</h1>
+
+<p>In case you have files in your <code class="language-plaintext highlighter-rouge">/root</code> directory, move it temporarily to <code class="language-plaintext highlighter-rouge">/tmp</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mkdir /tmp/root_temp
+mv /root/* /tmp/root_temp
+ls -lah /root
+</code></pre></div></div>
+
+<p>Mount the drive and write to it to confirm everything works as intended.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mount /dev/mmcblk0p3 /root
+cd /root
+echo "test" &gt; test.txt
+cat test.txt
+</code></pre></div></div>
+
+<p>You can now move all your files back to <code class="language-plaintext highlighter-rouge">/root</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mv /tmp/root_temp/* /root
+rmdir /tmp/root_temp/
+</code></pre></div></div>
+
+<h1 id="mount-the-overlay-partition">Mount the <code class="language-plaintext highlighter-rouge">/overlay</code> partition</h1>
+
+<p>Move the <code class="language-plaintext highlighter-rouge">/overlay</code> directory to the new partition with the following commands :</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mount /dev/mmcblk0p2 /mnt/
+tar -C /overlay -cvf - . | tar -C /mnt/ -xf -
+umount /mnt/
+</code></pre></div></div>
+
+<h1 id="automatically-mount-the-sd-card-at-boot">Automatically mount the SD Card at boot</h1>
+
+<p>Enable the fstab and detect the current mounts:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/etc/init.d/fstab enable
+block detect &gt; /etc/config/fstab
+</code></pre></div></div>
+
+<p>Edit the fstab.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>vi /etc/config/fstab
+</code></pre></div></div>
+
+<p>Make the following changes:</p>
+<ul>
+  <li>enable all mounts by switching <code class="language-plaintext highlighter-rouge">enabled</code> from <code class="language-plaintext highlighter-rouge">0</code> to <code class="language-plaintext highlighter-rouge">1</code></li>
+  <li>delete the <code class="language-plaintext highlighter-rouge">uuid</code> field of the swap</li>
+  <li>change the target <code class="language-plaintext highlighter-rouge">/mnt/mmcblk0p2</code> to <code class="language-plaintext highlighter-rouge">/overlay</code></li>
+  <li>change the target <code class="language-plaintext highlighter-rouge">/mnt/mmcblk0p3</code> to <code class="language-plaintext highlighter-rouge">/root</code></li>
+</ul>
+
+<p>The resulting file should look like this:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>config 'global'
+    option  anon_swap   '0'
+    option  anon_mount  '0'
+    option  auto_swap   '1'
+    option  auto_mount  '1'
+    option  delay_root  '5'
+    option  check_fs    '0'
+
+config 'swap'
+    option  device  '/dev/mmcblk0p1'
+    option  enabled '1'
+
+config 'mount'
+    option  target  '/overlay'
+    option  uuid    'YOUR-UUID-HERE'
+    option  enabled '1'
+
+config 'mount'
+    option  target  '/root'
+    option  uuid    'YOUR-UUID-HERE'
+    option  enabled '1'
+</code></pre></div></div>
+<h1 id="finish-and-validate">Finish and validate</h1>
+
+<p>Reboot and exit the shell.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>reboot &amp;&amp; exit
+</code></pre></div></div>
+
+<p>SSH back into the Omega and run <code class="language-plaintext highlighter-rouge">df -h</code> to confirm that <code class="language-plaintext highlighter-rouge">/root</code> and <code class="language-plaintext highlighter-rouge">/overlay</code> have the expected available space.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Filesystem                Size      Used Available Use% Mounted on
+/dev/root                 7.8M      7.8M         0 100% /rom
+tmpfs                    60.9M     96.0K     60.8M   0% /tmp
+/dev/mmcblk0p2            5.8G     24.2M      5.5G   0% /overlay
+overlayfs:/overlay        5.8G     24.2M      5.5G   0% /
+tmpfs                   512.0K         0    512.0K   0% /dev
+/dev/mmcblk0p3            6.7G     30.8M      6.3G   0% /mnt/mmcblk0p3
+/dev/mtdblock6           22.1M    700.0K     21.4M   3% /mnt/mtdblock6
+/dev/mtdblock7          512.0K    244.0K    268.0K  48% /mnt/mtdblock7
+</code></pre></div></div>
+
+<p>Then check the swap with <code class="language-plaintext highlighter-rouge">free</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>             total       used       free     shared    buffers     cached
+Mem:        125764      35868      89896        200       5256      12732
+-/+ buffers/cache:      17880     107884
+Swap:      2097148          0    2097148
+</code></pre></div></div>
+
+<p>You are done !</p>
+
+<h1 id="links">Links</h1>
+
+<p>This tutorial is largely based on <a href="https://github.com/pjobson/onion_omega2p_experiments/blob/master/docs/setting_up_sdcard_for_root_and_swap.md">this guide</a> by GitHub user <a href="https://github.com/pjobson">pjobson</a> and <a href="https://docs.onion.io/omega2-docs/boot-from-external-storage.html">this guide</a> by Onion.</p>]]></content><author><name></name></author><category term="omega" /><summary type="html"><![CDATA[TL;DR]]></summary></entry><entry><title type="html">Export a Grafana dashboard to PDF with legends in Grafana v8+</title><link href="/grafana/2022/05/30/grafana-to-pdf.html" rel="alternate" type="text/html" title="Export a Grafana dashboard to PDF with legends in Grafana v8+" /><published>2022-05-30T05:17:02-05:00</published><updated>2022-05-30T05:17:02-05:00</updated><id>/grafana/2022/05/30/grafana-to-pdf</id><content type="html" xml:base="/grafana/2022/05/30/grafana-to-pdf.html"><![CDATA[<h1 id="tldr">TL;DR</h1>
+
+<p>This short article describes how to automatically generate PDFs from a Grafana dashboard when:</p>
+<ul>
+  <li>you are not using the paid Grafana Enterprise version</li>
+  <li>you are using Grafana <code class="language-plaintext highlighter-rouge">v7.4.0</code> or more recent</li>
+</ul>
+
+<h1 id="context">Context</h1>
+
+<p>If you use Grafana dashboards, you might want (or might have been asked) to generate PDF snapshots of those dashboards.
+This is a feature supported by <strong>Grafana Enterprise only</strong> (starting from version <code class="language-plaintext highlighter-rouge">v6.7+</code>, see related <a href="https://grafana.com/docs/grafana/latest/enterprise/export-pdf/">docs</a>).</p>
+
+<p>Many, me included, use the Open Source version and have relied on an alternative relying on the “Print to PDF” option of web browsers, which can be automated using a headless browser using <code class="language-plaintext highlighter-rouge">NodeJS</code> and the <code class="language-plaintext highlighter-rouge">puppeteer</code> package. Full credit to GitHub user <a href="https://gist.github.com/svet-b">svet-b</a> and his detailed description found <a href="https://gist.github.com/svet-b/1ad0656cd3ce0e1a633e16eb20f66425">here</a>.</p>
+
+<p>However, since the update to <code class="language-plaintext highlighter-rouge">v7.4.0</code>, the legend is not properly shown when generating the PDF, as you can see from the screenshots below.</p>
+
+<p><img src="/img/legend-nok.png" alt="The color lines of the legend are not properly rendered" /></p>
+
+<p>I posted an <a href="https://github.com/grafana/grafana/issues/36656">issue</a> to Grafana’s GitHub repository documenting the issue with the legend. It was not really investigated (neither by the Grafana team nor me).</p>
+
+<p>A simple workaround is to simply take a (lossless) <strong>screenshot</strong> of the full page with a headless browser. The screenshot can then be converted to PDF via the command line.</p>
+
+<h1 id="installation">Installation</h1>
+
+<p>The screenshot is taken using <code class="language-plaintext highlighter-rouge">NodeJS</code> and the <code class="language-plaintext highlighter-rouge">puppeteer</code> package, and the PDF conversion is done via <code class="language-plaintext highlighter-rouge">img2pdf</code>. On a Debian-based system, the dependencies and programs can be installed via:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo apt install nodejs npm img2pdf gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils wget
+</code></pre></div></div>
+
+<p>Then, install the <code class="language-plaintext highlighter-rouge">puppeteer</code> package:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>npm install puppeteer
+</code></pre></div></div>
+
+<h1 id="running">Running</h1>
+
+<p>The Node script generating the screenshot is the following:</p>
+
+<figure class="highlight"><pre><code class="language-javascript" data-lang="javascript"><span class="dl">'</span><span class="s1">use strict</span><span class="dl">'</span><span class="p">;</span>
+
+<span class="kd">const</span> <span class="nx">puppeteer</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">puppeteer</span><span class="dl">'</span><span class="p">);</span>
+
+<span class="c1">// URL to load should be passed as first parameter</span>
+<span class="kd">const</span> <span class="nx">url</span> <span class="o">=</span> <span class="nx">process</span><span class="p">.</span><span class="nx">argv</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span>
+<span class="c1">// Username and password (with colon separator) should be second parameter</span>
+<span class="kd">const</span> <span class="nx">auth_string</span> <span class="o">=</span> <span class="nx">process</span><span class="p">.</span><span class="nx">argv</span><span class="p">[</span><span class="mi">3</span><span class="p">];</span>
+<span class="c1">// Output file name should be third parameter</span>
+<span class="kd">const</span> <span class="nx">outfile</span> <span class="o">=</span> <span class="nx">process</span><span class="p">.</span><span class="nx">argv</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span>
+
+<span class="c1">// TODO: Output an error message if number of arguments is not right or arguments are invalid</span>
+
+<span class="c1">// Set the browser width in pixels. The paper size will be calculated on the basus of 96dpi,</span>
+<span class="c1">// so 1200 corresponds to 12.5".</span>
+<span class="kd">const</span> <span class="nx">width_px</span> <span class="o">=</span> <span class="mi">1200</span><span class="p">;</span>
+<span class="c1">// Note that to get an actual paper size, e.g. Letter, you will want to *not* simply set the pixel</span>
+<span class="c1">// size here, since that would lead to a "mobile-sized" screen (816px), and mess up the rendering.</span>
+<span class="c1">// Instead, set e.g. double the size here (1632px), and call page.pdf() with format: 'Letter' and</span>
+<span class="c1">// scale = 0.5.</span>
+
+<span class="c1">// Generate authorization header for basic auth</span>
+<span class="kd">const</span> <span class="nx">auth_header</span> <span class="o">=</span> <span class="dl">'</span><span class="s1">Basic </span><span class="dl">'</span> <span class="o">+</span> <span class="k">new</span> <span class="nx">Buffer</span><span class="p">.</span><span class="k">from</span><span class="p">(</span><span class="nx">auth_string</span><span class="p">).</span><span class="nx">toString</span><span class="p">(</span><span class="dl">'</span><span class="s1">base64</span><span class="dl">'</span><span class="p">);</span>
+
+<span class="p">(</span><span class="k">async</span><span class="p">()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">browser</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">puppeteer</span><span class="p">.</span><span class="nx">launch</span><span class="p">({</span><span class="na">args</span><span class="p">:</span> <span class="p">[</span><span class="dl">'</span><span class="s1">--no-sandbox</span><span class="dl">'</span><span class="p">,</span> <span class="dl">'</span><span class="s1">--disable-setuid-sandbox</span><span class="dl">'</span><span class="p">]});</span>
+  <span class="kd">const</span> <span class="nx">page</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">browser</span><span class="p">.</span><span class="nx">newPage</span><span class="p">();</span>
+
+  <span class="c1">// Set basic auth headers</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">setExtraHTTPHeaders</span><span class="p">({</span><span class="dl">'</span><span class="s1">Authorization</span><span class="dl">'</span><span class="p">:</span> <span class="nx">auth_header</span><span class="p">});</span>
+
+  <span class="c1">// Increase timeout from the default of 30 seconds to 120 seconds, to allow for slow-loading panels</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">setDefaultNavigationTimeout</span><span class="p">(</span><span class="mi">7200</span><span class="p">);</span>
+
+  <span class="c1">// Increasing the deviceScaleFactor gets a higher-resolution image. The width should be set to</span>
+  <span class="c1">// the same value as in page.screenshot() below. The height is not important but should be long</span>
+  <span class="c1">// enough to get the whole page</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">setViewport</span><span class="p">({</span>
+    <span class="na">width</span><span class="p">:</span> <span class="nx">width_px</span><span class="p">,</span>
+    <span class="na">height</span><span class="p">:</span> <span class="mi">10000</span><span class="p">,</span>
+    <span class="na">deviceScaleFactor</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="na">isMobile</span><span class="p">:</span> <span class="kc">false</span>
+  <span class="p">})</span>
+
+  <span class="c1">// Wait until all network connections are closed (and none are opened withing 0.5s).</span>
+  <span class="c1">// In some cases it may be appropriate to change this to {waitUntil: 'networkidle2'},</span>
+  <span class="c1">// which stops when there are only 2 or fewer connections remaining.</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">goto</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span> <span class="p">{</span><span class="na">waitUntil</span><span class="p">:</span> <span class="dl">'</span><span class="s1">networkidle0</span><span class="dl">'</span><span class="p">});</span>
+
+  <span class="c1">// Hide all panel description (top-left "i") pop-up handles and, all panel resize handles</span>
+  <span class="c1">// Annoyingly, it seems you can't concatenate the two object collections into one</span>
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">evaluate</span><span class="p">(()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="kd">let</span> <span class="nx">infoCorners</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByClassName</span><span class="p">(</span><span class="dl">'</span><span class="s1">panel-info-corner</span><span class="dl">'</span><span class="p">);</span>
+    <span class="k">for</span> <span class="p">(</span><span class="nx">el</span> <span class="k">of</span> <span class="nx">infoCorners</span><span class="p">)</span> <span class="p">{</span> <span class="nx">el</span><span class="p">.</span><span class="nx">hidden</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span> <span class="p">};</span>
+    <span class="kd">let</span> <span class="nx">resizeHandles</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByClassName</span><span class="p">(</span><span class="dl">'</span><span class="s1">react-resizable-handle</span><span class="dl">'</span><span class="p">);</span>
+    <span class="k">for</span> <span class="p">(</span><span class="nx">el</span> <span class="k">of</span> <span class="nx">resizeHandles</span><span class="p">)</span> <span class="p">{</span> <span class="nx">el</span><span class="p">.</span><span class="nx">hidden</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span> <span class="p">};</span>
+  <span class="p">});</span>
+
+  <span class="c1">// Get the height of the main canvas, and add a margin</span>
+  <span class="kd">var</span> <span class="nx">height_px</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">evaluate</span><span class="p">(()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByClassName</span><span class="p">(</span><span class="dl">'</span><span class="s1">react-grid-layout</span><span class="dl">'</span><span class="p">)[</span><span class="mi">0</span><span class="p">].</span><span class="nx">getBoundingClientRect</span><span class="p">().</span><span class="nx">bottom</span><span class="p">;</span>
+  <span class="p">})</span> <span class="o">+</span> <span class="mi">20</span><span class="p">;</span>
+
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">height_px</span><span class="p">);</span>
+
+  <span class="k">await</span> <span class="nx">page</span><span class="p">.</span><span class="nx">screenshot</span><span class="p">({</span>
+    <span class="na">path</span><span class="p">:</span> <span class="nx">outfile</span><span class="p">,</span>
+    <span class="na">clip</span><span class="p">:</span> <span class="p">{</span>
+      <span class="na">x</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+      <span class="na">y</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+      <span class="na">width</span><span class="p">:</span> <span class="nx">width_px</span><span class="p">,</span>
+      <span class="na">height</span><span class="p">:</span> <span class="nx">height_px</span>
+    <span class="p">}</span>
+  <span class="p">});</span>
+
+  <span class="k">await</span> <span class="nx">browser</span><span class="p">.</span><span class="nx">close</span><span class="p">();</span>
+<span class="p">})();</span></code></pre></figure>
+
+<p>The script, for example saved as <code class="language-plaintext highlighter-rouge">grafana_pdf.js</code>, is then run by the following command :</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>node grafana_pdf.js DASHBOARD_URL USERNAME:PASSWORD FILENAME
+</code></pre></div></div>
+
+<p>where:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">DASHBOARD_URL</code> is the URL of the dashboard to generate</li>
+  <li><code class="language-plaintext highlighter-rouge">USERNAME:PASSWORD</code> are your credentials, for example the defaut <code class="language-plaintext highlighter-rouge">admin:admin</code></li>
+  <li><code class="language-plaintext highlighter-rouge">FILENAME</code> is the expected output filename</li>
+</ul>
+
+<p>The arguments can also be hardcoded in the code, or used as environmental variables depending on your preferences.</p>
+
+<p>The PNG screenshot can then be converted to PDF via</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>img2pdf screenshot.png -o output.pdf
+</code></pre></div></div>
+
+<p>The series of command can easily be automated via a cron job to generate a report at a given interval.</p>]]></content><author><name></name></author><category term="grafana" /><summary type="html"><![CDATA[TL;DR]]></summary></entry></feed>

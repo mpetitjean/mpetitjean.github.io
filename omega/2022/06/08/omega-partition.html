@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Extend memory and swap with an SD card on an Omega2S | Mathieu Petitjean’s blog</title>
+<meta name="generator" content="Jekyll v4.2.2" />
+<meta property="og:title" content="Extend memory and swap with an SD card on an Omega2S" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="TL;DR" />
+<meta property="og:description" content="TL;DR" />
+<link rel="canonical" href="/omega/2022/06/08/omega-partition.html" />
+<meta property="og:url" content="/omega/2022/06/08/omega-partition.html" />
+<meta property="og:site_name" content="Mathieu Petitjean’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2022-06-08T05:17:02-05:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Extend memory and swap with an SD card on an Omega2S" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","dateModified":"2022-06-08T05:17:02-05:00","datePublished":"2022-06-08T05:17:02-05:00","description":"TL;DR","headline":"Extend memory and swap with an SD card on an Omega2S","mainEntityOfPage":{"@type":"WebPage","@id":"/omega/2022/06/08/omega-partition.html"},"url":"/omega/2022/06/08/omega-partition.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="/feed.xml" title="Mathieu Petitjean&apos;s blog" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Mathieu Petitjean&#39;s blog</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a><a class="page-link" href="/publications/">Publications</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Extend memory and swap with an SD card on an Omega2S</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2022-06-08T05:17:02-05:00" itemprop="datePublished">Jun 8, 2022
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <h3 id="tldr">TL;DR</h3>
+
+<p>This post describes how to use an SD card to extend the storage space and create swap for an Omega2S/Omega2S+.</p>
+
+<h3 id="context">Context</h3>
+
+<h1 id="storage">Storage</h1>
+
+<p>The filesystem of the Omega has two main parts: <code class="language-plaintext highlighter-rouge">/rom</code> contains the base firmware and is read-only and <code class="language-plaintext highlighter-rouge">/overlay</code> contains the changes on top of the base firmware, typically the packages installed via <code class="language-plaintext highlighter-rouge">opkg</code>. At boot, both are used to create the entire filesystem.</p>
+
+<p>The <code class="language-plaintext highlighter-rouge">/overlay</code> and <code class="language-plaintext highlighter-rouge">/root</code> can be mounted to dedicated partitions of an SD card to circumvent the harsh storage limitations of the Omega.</p>
+
+<h1 id="swap">Swap</h1>
+
+<p>Yet another partition of the SD Card can be used to virtually extend the RAM of the Omega.</p>
+
+<h3 id="setup">Setup</h3>
+
+<h1 id="installation">Installation</h1>
+
+<p>Install the required packages via <code class="language-plaintext highlighter-rouge">opkg</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>opkg update
+opkg install fdisk kmod-fs-ext4 e2fsprogs swap-utils block-mount
+</code></pre></div></div>
+
+<h1 id="preparation">Preparation</h1>
+
+<p>Insert your SD Card and look for it via</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fdisk -l
+</code></pre></div></div>
+
+<p>One of the entries should look like the following:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Disk /dev/mmcblk0: 14.9 GiB, 15931539456 bytes, 31116288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+</code></pre></div></div>
+
+<p>The SD card should appear under <code class="language-plaintext highlighter-rouge">/dev/mmcblk0</code>. Mine is a 16 GB SD card, detected as 14.9 GiB. If your SD card is already partitioned, the partitions will show up as <code class="language-plaintext highlighter-rouge">/dev/mmcblk0p1</code>, <code class="language-plaintext highlighter-rouge">/dev/mmcblk0p2</code>, etc. These partitions should be deleted before continuing the process.</p>
+
+<p>Make sure the SD card is not currently mounted by running</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>umount /dev/mmcblk0
+</code></pre></div></div>
+<p>If it was not mounted, the following error will be thrown:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>umount: can't unmount /dev/mmcblk0: Invalid argument
+</code></pre></div></div>
+
+<p>You can confirm that no swap is available by running</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>free
+</code></pre></div></div>
+<p>and observing in the output that all swap entries are 0.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>             total       used       free     shared    buffers     cached
+Mem:        124792      43848      80944         96       5784      15928
+-/+ buffers/cache:      22136     102656
+Swap:            0          0          0
+</code></pre></div></div>
+
+<h1 id="create-partitions">Create partitions</h1>
+
+<p>Use <code class="language-plaintext highlighter-rouge">fdisk</code> to create the partitions.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fdisk /dev/mmcblk0
+</code></pre></div></div>
+
+<p>A prompt will open. We will create 3 partitions: a first of 2GB for the swap, a second of 6GB for the <code class="language-plaintext highlighter-rouge">/overlay</code> and a third of roughly 8GB for <code class="language-plaintext highlighter-rouge">/root</code>.</p>
+
+<p>Enter the following commands to create the 3 partitions:</p>
+<ul>
+  <li>type <code class="language-plaintext highlighter-rouge">n</code> to create the swap partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">p</code> to select the primary type</li>
+  <li>type <code class="language-plaintext highlighter-rouge">1</code> for the partition number</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to accept the proposed first sector</li>
+  <li>type <code class="language-plaintext highlighter-rouge">+2G</code> to select a size of 2GB for the partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">n</code> to create the <code class="language-plaintext highlighter-rouge">/overlay</code> partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">p</code> to select the primary type</li>
+  <li>type <code class="language-plaintext highlighter-rouge">2</code> for the partition number</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to accept the proposed first sector</li>
+  <li>type <code class="language-plaintext highlighter-rouge">+6G</code> to select a size of 6GB for the partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">n</code> to create the <code class="language-plaintext highlighter-rouge">/root</code> partition</li>
+  <li>type <code class="language-plaintext highlighter-rouge">p</code> to select the primary type</li>
+  <li>type <code class="language-plaintext highlighter-rouge">3</code> for the partition number</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to accept the proposed first sector</li>
+  <li>type <code class="language-plaintext highlighter-rouge">Enter</code> to select the last sector as to use the remaining space (should be around 8GB for a 16GB SD Card)</li>
+</ul>
+
+<p>The full output of the <code class="language-plaintext highlighter-rouge">fdisk</code> prompt should look like this:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Welcome to fdisk (util-linux 2.32).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 1
+First sector (2048-31116287, default 2048):
+Last sector, +sectors or +size{K,M,G,T,P} (2048-31116287, default 31116287): +2G
+
+Created a new partition 1 of type 'Linux' and of size 2 GiB.
+
+Command (m for help): n
+Partition type
+   p   primary (1 primary, 0 extended, 3 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (2-4, default 2): 2
+First sector (4196352-31116287, default 4196352):
+Last sector, +sectors or +size{K,M,G,T,P} (4196352-31116287, default 31116287): +6G
+
+Created a new partition 2 of type 'Linux' and of size 6 GiB.
+
+Command (m for help): n
+Partition type
+   p   primary (2 primary, 0 extended, 2 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (3,4, default 3): 3
+First sector (16779264-31116287, default 16779264):
+Last sector, +sectors or +size{K,M,G,T,P} (16779264-31116287, default 31116287):
+
+Created a new partition 3 of type 'Linux' and of size 6.9 GiB.
+</code></pre></div></div>
+
+<p>Switch the partition type of the swap partition by pressing <code class="language-plaintext highlighter-rouge">t</code>, <code class="language-plaintext highlighter-rouge">1</code>, then <code class="language-plaintext highlighter-rouge">82</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Command (m for help): t
+Partition number (1,2,3, default 3): 1
+Partition type (type L to list all types): 82
+
+Changed type of partition 'Linux' to 'Linux swap / Solaris'.
+</code></pre></div></div>
+
+<p>You can now print the partition table that you created with the <code class="language-plaintext highlighter-rouge">p</code> command and verify that everything looks right.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Disk /dev/mmcblk0: 14.9 GiB, 15931539456 bytes, 31116288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x3d19fbba
+
+Device         Boot    Start      End  Sectors  Size Id Type
+/dev/mmcblk0p1          2048  4196351  4194304    2G 82 Linux swap / Solaris
+/dev/mmcblk0p2       4196352 16779263 12582912    6G 83 Linux
+/dev/mmcblk0p3      16779264 31116287 14337024  6.9G 83 Linux
+</code></pre></div></div>
+
+<p>Write the partition with the <code class="language-plaintext highlighter-rouge">w</code> command.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+</code></pre></div></div>
+
+<p>You can now run <code class="language-plaintext highlighter-rouge">fdisk -l</code> again and observe that your partitions have been changed.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Disk /dev/mmcblk0: 14.9 GiB, 15931539456 bytes, 31116288 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x3d19fbba
+
+Device         Boot    Start      End  Sectors  Size Id Type
+/dev/mmcblk0p1          2048  4196351  4194304    2G 82 Linux swap / Solaris
+/dev/mmcblk0p2       4196352 16779263 12582912    6G 83 Linux
+/dev/mmcblk0p3      16779264 31116287 14337024  6.9G 83 Linux
+</code></pre></div></div>
+
+<h1 id="format-the-sd-card">Format the SD Card</h1>
+
+<p>Format both Linux partitions as ext4.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mkfs.ext4 /dev/mmcblk0p2
+mkfs.ext4 /dev/mmcblk0p3
+</code></pre></div></div>
+
+<h1 id="setup-swap">Setup swap</h1>
+
+<p>Format the Linux swap partition and enable the swap.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mkswap /dev/mmcblk0p1
+swapon /dev/mmcblk0p1
+</code></pre></div></div>
+
+<p>You can run again the <code class="language-plaintext highlighter-rouge">free -k</code> command, which should now display the new swap space:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>             total       used       free     shared    buffers     cached
+Mem:        124792      35748      89044         96       5876       7160
+-/+ buffers/cache:      22712     102080
+Swap:      2097148          0    2097148
+
+</code></pre></div></div>
+
+<h1 id="mount-the-root-partition">Mount the <code class="language-plaintext highlighter-rouge">/root</code> partition</h1>
+
+<p>In case you have files in your <code class="language-plaintext highlighter-rouge">/root</code> directory, move it temporarily to <code class="language-plaintext highlighter-rouge">/tmp</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mkdir /tmp/root_temp
+mv /root/* /tmp/root_temp
+ls -lah /root
+</code></pre></div></div>
+
+<p>Mount the drive and write to it to confirm everything works as intended.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mount /dev/mmcblk0p3 /root
+cd /root
+echo "test" &gt; test.txt
+cat test.txt
+</code></pre></div></div>
+
+<p>You can now move all your files back to <code class="language-plaintext highlighter-rouge">/root</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mv /tmp/root_temp/* /root
+rmdir /tmp/root_temp/
+</code></pre></div></div>
+
+<h1 id="mount-the-overlay-partition">Mount the <code class="language-plaintext highlighter-rouge">/overlay</code> partition</h1>
+
+<p>Move the <code class="language-plaintext highlighter-rouge">/overlay</code> directory to the new partition with the following commands :</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>mount /dev/mmcblk0p2 /mnt/
+tar -C /overlay -cvf - . | tar -C /mnt/ -xf -
+umount /mnt/
+</code></pre></div></div>
+
+<h1 id="automatically-mount-the-sd-card-at-boot">Automatically mount the SD Card at boot</h1>
+
+<p>Enable the fstab and detect the current mounts:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/etc/init.d/fstab enable
+block detect &gt; /etc/config/fstab
+</code></pre></div></div>
+
+<p>Edit the fstab.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>vi /etc/config/fstab
+</code></pre></div></div>
+
+<p>Make the following changes:</p>
+<ul>
+  <li>enable all mounts by switching <code class="language-plaintext highlighter-rouge">enabled</code> from <code class="language-plaintext highlighter-rouge">0</code> to <code class="language-plaintext highlighter-rouge">1</code></li>
+  <li>delete the <code class="language-plaintext highlighter-rouge">uuid</code> field of the swap</li>
+  <li>change the target <code class="language-plaintext highlighter-rouge">/mnt/mmcblk0p2</code> to <code class="language-plaintext highlighter-rouge">/overlay</code></li>
+  <li>change the target <code class="language-plaintext highlighter-rouge">/mnt/mmcblk0p3</code> to <code class="language-plaintext highlighter-rouge">/root</code></li>
+</ul>
+
+<p>The resulting file should look like this:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>config 'global'
+    option  anon_swap   '0'
+    option  anon_mount  '0'
+    option  auto_swap   '1'
+    option  auto_mount  '1'
+    option  delay_root  '5'
+    option  check_fs    '0'
+
+config 'swap'
+    option  device  '/dev/mmcblk0p1'
+    option  enabled '1'
+
+config 'mount'
+    option  target  '/overlay'
+    option  uuid    'YOUR-UUID-HERE'
+    option  enabled '1'
+
+config 'mount'
+    option  target  '/root'
+    option  uuid    'YOUR-UUID-HERE'
+    option  enabled '1'
+</code></pre></div></div>
+<h1 id="finish-and-validate">Finish and validate</h1>
+
+<p>Reboot and exit the shell.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>reboot &amp;&amp; exit
+</code></pre></div></div>
+
+<p>SSH back into the Omega and run <code class="language-plaintext highlighter-rouge">df -h</code> to confirm that <code class="language-plaintext highlighter-rouge">/root</code> and <code class="language-plaintext highlighter-rouge">/overlay</code> have the expected available space.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Filesystem                Size      Used Available Use% Mounted on
+/dev/root                 7.8M      7.8M         0 100% /rom
+tmpfs                    60.9M     96.0K     60.8M   0% /tmp
+/dev/mmcblk0p2            5.8G     24.2M      5.5G   0% /overlay
+overlayfs:/overlay        5.8G     24.2M      5.5G   0% /
+tmpfs                   512.0K         0    512.0K   0% /dev
+/dev/mmcblk0p3            6.7G     30.8M      6.3G   0% /mnt/mmcblk0p3
+/dev/mtdblock6           22.1M    700.0K     21.4M   3% /mnt/mtdblock6
+/dev/mtdblock7          512.0K    244.0K    268.0K  48% /mnt/mtdblock7
+</code></pre></div></div>
+
+<p>Then check the swap with <code class="language-plaintext highlighter-rouge">free</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>             total       used       free     shared    buffers     cached
+Mem:        125764      35868      89896        200       5256      12732
+-/+ buffers/cache:      17880     107884
+Swap:      2097148          0    2097148
+</code></pre></div></div>
+
+<p>You are done !</p>
+
+<h1 id="links">Links</h1>
+
+<p>This tutorial is largely based on <a href="https://github.com/pjobson/onion_omega2p_experiments/blob/master/docs/setting_up_sdcard_for_root_and_swap.md">this guide</a> by GitHub user <a href="https://github.com/pjobson">pjobson</a> and <a href="https://docs.onion.io/omega2-docs/boot-from-external-storage.html">this guide</a> by Onion.</p>
+
+
+  </div><a class="u-url" href="/omega/2022/06/08/omega-partition.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Mathieu Petitjean&#39;s blog</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Mathieu Petitjean&#39;s blog</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/mpetitjean"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">mpetitjean</span></a></li><li><a href="https://www.twitter.com/mpetitje"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg> <span class="username">mpetitje</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Random tech tutorials</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

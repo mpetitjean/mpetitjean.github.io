@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>PWM-controlled variable voltage source using a LM317 | Mathieu Petitjean’s blog</title>
+<meta name="generator" content="Jekyll v4.2.2" />
+<meta property="og:title" content="PWM-controlled variable voltage source using a LM317" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="TL;DR" />
+<meta property="og:description" content="TL;DR" />
+<link rel="canonical" href="/hardware/2022/08/01/variable-voltage-source.html" />
+<meta property="og:url" content="/hardware/2022/08/01/variable-voltage-source.html" />
+<meta property="og:site_name" content="Mathieu Petitjean’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2022-08-01T03:17:02-05:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="PWM-controlled variable voltage source using a LM317" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","dateModified":"2022-08-01T03:17:02-05:00","datePublished":"2022-08-01T03:17:02-05:00","description":"TL;DR","headline":"PWM-controlled variable voltage source using a LM317","mainEntityOfPage":{"@type":"WebPage","@id":"/hardware/2022/08/01/variable-voltage-source.html"},"url":"/hardware/2022/08/01/variable-voltage-source.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="/feed.xml" title="Mathieu Petitjean&apos;s blog" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Mathieu Petitjean&#39;s blog</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a><a class="page-link" href="/publications/">Publications</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">PWM-controlled variable voltage source using a LM317</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2022-08-01T03:17:02-05:00" itemprop="datePublished">Aug 1, 2022
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <h1 id="tldr">TL;DR</h1>
+
+<p>This post describes how to use a LM317 module to generate a voltage source that can be controlled by a microcontroller using PWM signals and a generic op-amp.</p>
+
+<h1 id="the-problem">The problem</h1>
+
+<p>One of my projects required me to generate a 1A power supply that could programmatically be adjusted between 2V and 9V by a microcontroller operating with 3.3V logic.</p>
+
+<p>The board embeds both 12V and 3.3V rails.</p>
+
+<h1 id="the-lm317-voltage-regulator">The LM317 voltage regulator</h1>
+
+<p>The LM317 is an extermely widespread adjustable voltage regulator capable of supplying 1.5A over a voltage range of 1.25 to 37V (see <a href="https://www.ti.com/lit/ds/symlink/lm317.pdf">full datasheet</a>).</p>
+
+<p>The typical application circuit, as suggested in the datasheet, is shown below.</p>
+
+<p><img src="/img/lm317-base.png" alt="Typical application circuit of the LM317" /></p>
+
+<p>The output voltage is set by the value of the resistors R1 and R2, such that Vout = 1.25V x (1 + R2/R1). In an application where a constant voltage is required, the resistors can be set permanantly. The resistor R2 can also be replaced by a potentiometer to allow for manual adjustment.</p>
+
+<p>The voltage generation can be better understood when looking at the functional block diagram of the LM317.</p>
+
+<p><img src="/img/lm317-block.png" alt="LM317 functionnal block diagram" /></p>
+
+<p>It can be seen that an internal op-amp with a constant input offset voltage of 1.25V is maintaining a constant 1.25V voltage difference between the OUTPUT and ADJUST pins. A higher R2 value will lead to a higher ADJUST voltage, and the OUTPUT voltage will be 1.25V more.</p>
+
+<p>This constant 1.25V between the two pins can be exploited to programmatically change the output voltage.</p>
+
+<h1 id="pwm-control">PWM control</h1>
+
+<p>Since my particular application requires an output voltage between 2V and 9V, the ADJUST pin needs to be freely set between 0.75V and 7.75V.</p>
+
+<p>With a microcontroller that does not embed any DAC, this can be achieved by generating a 3.3V PWM signal which is then lowpass-filtered (<em>i.e.</em> averaged out), than amplified.</p>
+
+<p>The resulting complete schematic is the following:</p>
+
+<p><img src="/img/lm317-pwm.png" alt="Complete schematic with PWM control" /></p>
+
+<p>The PWM signal is filtered to (roughly) DC by a low-pass filter with a 1Hz cut-off frequency. Depending on the ducty cycle of the PWM, the voltage at the input of the op-amp will range from 0 to 3.3V. It is then amplified a by the non-inverting op-amp with a gain of 2.3 to a range that roughly scales from 0 to 7.75V. Finally, the output voltage ranges from 1.25 to 9V.</p>
+
+<p>Note that the resistor R4 is crucial for proper operation of the LM317 at no load. Indeed, as specified in the datasheet, a minimum load current of 3.5 to 10 mA is required to maintain the required output voltage. This current is flowing through resistor R4 when no other load is connected.</p>
+
+  </div><a class="u-url" href="/hardware/2022/08/01/variable-voltage-source.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">Mathieu Petitjean&#39;s blog</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">Mathieu Petitjean&#39;s blog</li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/mpetitjean"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">mpetitjean</span></a></li><li><a href="https://www.twitter.com/mpetitje"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#twitter"></use></svg> <span class="username">mpetitje</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>Random tech tutorials</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
